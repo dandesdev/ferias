@@ -39,22 +39,20 @@
         <label class="f">De<input type="month" id="from" min="2026-01"></label>
         <label class="f">Até<input type="month" id="to" min="2026-01"></label>
       </div>
-      <div class="row2">
-        <label class="f w-sm">Férias (dias)<input type="number" id="total" min="1" max="90"></label>
-        <div class="f">Extensão a trancar
-          <div class="lockrow">
-            <input type="number" id="len" min="1" max="90">
-            <button id="lock" class="lock">Trancar</button>
-          </div>
-        </div>
-      </div>
-      <div id="remain" class="remain"></div>
     </section>
 
-    <section class="grp" id="periodsGrp">
-      <div class="ttl">Períodos <button id="clear" class="link">limpar</button></div>
+    <section class="grp">
+      <div class="vac">
+        <label class="inl">Férias <input type="number" id="total" min="1" max="90"> dias</label>
+        <span id="remain" class="remain"></span>
+      </div>
       <div id="periods"></div>
+      <div id="lockBox" class="lockbox">
+        <input type="number" id="len" min="1" max="90" aria-label="Extensão em dias"><span>dias</span>
+        <button id="lock" class="lock">Trancar</button>
+      </div>
       <div id="summary" class="summary"></div>
+      <button id="clear" class="link" hidden>limpar períodos</button>
     </section>
 
     <section class="grp" id="suggGrp" hidden>
@@ -73,12 +71,6 @@
       <span><i class="sw gain"></i>dia ganho</span>
       <span><i class="sw best"></i>bom início</span>
     </section>
-    <p class="help">
-      <b>Trancar</b> fixa a extensão. Depois passe o mouse no calendário e clique no dia de início.
-      Clique num período para movê-lo. <b>Botão direito</b> num dia marca uma folga sua ou desconsidera um feriado.
-      <kbd>Esc</kbd> cancela.
-    </p>
-    <p class="src">Feriados municipais e estaduais: <a href="https://github.com/joaopbini/feriados-brasil" target="_blank" rel="noopener">feriados-brasil</a> (base 2026, projetada para os anos seguintes). Confira as datas locais antes de marcar suas férias.</p>
   </aside>
 
   <main id="cal"></main>

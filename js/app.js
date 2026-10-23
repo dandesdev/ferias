@@ -175,12 +175,14 @@ function computeSuggestions() {
   for (let n = Math.max(range.a, TODAY + 1); n <= range.b - len + 1; n++) {
     const st = stats(n, len, list);
     if (st.overlap || st.warn) continue;
-    st.score = st.total / Math.max(st.work, 0.5);
     cands.push(st);
   }
-  cands.sort((x, y) => y.score - x.score || y.total - x.total || x.start - y.start);
-  const cut = cands[Math.floor(cands.length * 0.06)]?.score ?? Infinity;
-  for (const c of cands) if (c.score >= cut && c.gain > 0) sugg.best.add(c.start);
+  // As férias custam sempre os mesmos dias corridos: vale mais o maior descanso contínuo,
+  // e, no empate, o que desperdiça menos folgas dentro do período.
+  cands.sort((x, y) => y.total - x.total || x.lost - y.lost || x.start - y.start);
+  const median = [...cands].sort((x, y) => x.total - y.total)[cands.length >> 1]?.total ?? 0;
+  const cut = cands[Math.floor(cands.length * 0.05)]?.total ?? Infinity;
+  for (const c of cands) if (c.total >= cut && c.total > median) sugg.best.add(c.start);
   for (const c of cands) {
     if (sugg.list.length >= 8) break;
     if (sugg.list.some((s) => c.a <= s.b + 3 && c.b >= s.a - 3)) continue;
@@ -204,16 +206,16 @@ function renderSide() {
   $("#total").value = S.total;
   $("#len").max = Math.max(rem, 1);
   if (!placing) $("#len").value = S.len;
-  const lock = $("#lock");
-  lock.classList.toggle("on", !!placing);
-  lock.textContent = placing ? "Destrancar" : rem ? "Trancar" : "Sem saldo";
-  lock.disabled = !placing && !rem;
-  $("#remain").innerHTML = `Saldo: <b>${rem}</b> de ${S.total} dias` + (placing ? ` · <b>${placing.len}</b> dias trancados, clique no dia de início` : "");
+  $("#lock").textContent = placing ? "Soltar" : "Trancar";
+  $("#lockBox").classList.toggle("on", !!placing);
+  $("#lockBox").hidden = !placing && !rem;
+  $("#remain").innerHTML = `saldo <b>${rem}</b>`;
+  $("#clear").hidden = !S.periods.length;
   $("#cal").classList.toggle("placing", !!placing);
 
   const list = periods();
   const box = $("#periods");
-  if (!list.length) box.innerHTML = `<div class="empty">Nenhum período marcado.</div>`;
+  if (!list.length) box.innerHTML = "";
   else {
     const html = [];
     let tot = { total: 0, work: 0, gain: 0, lost: 0 };
@@ -252,7 +254,7 @@ function renderSide() {
   if (placing) {
     $("#suggLen").textContent = placing.len;
     $("#sugg").innerHTML = sugg.list.length
-      ? sugg.list.map((c) => `<div class="sg" data-n="${c.start}"><span>${WD[dow(c.start)]} ${fmt(c.start)}</span><span><b class="g">${c.total}</b> de descanso · ${c.work} úteis</span></div>`).join("")
+      ? sugg.list.map((c) => `<div class="sg" data-n="${c.start}"><span>${WD[dow(c.start)]} ${fmt(c.start)}</span><span><b class="g">${c.total}</b> de descanso · +${c.gain} −${c.lost}</span></div>`).join("")
       : `<div class="empty">Sem opções livres no intervalo.</div>`;
   }
 }
@@ -311,9 +313,6 @@ function showTip(n, ev) {
         `<div><span class="g">+${st.gain} ganhos</span> · <span class="l">−${st.lost} perdidos</span> · ${st.work} úteis</div>`);
       if (st.warn) lines.push(`<div class="warn">⚠ ${st.warn}</div>`);
     }
-  } else {
-    const p = inPeriod(n);
-    if (p) lines.push(`<div class="s">Clique para mover este período</div>`);
   }
   if (lines.length === 1) { hideTip(); return; }
   tip.innerHTML = lines.join("");
