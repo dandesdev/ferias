@@ -12,8 +12,14 @@
       <button id="mode" class="icon" title="Ocultar painel" aria-label="Ocultar painel">
         <svg class="i-close" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M16 15l-3-3 3-3"/></svg>
         <svg class="i-open" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M14 9l3 3-3 3"/></svg>
+        <svg class="i-cfg" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
       </button>
       <span class="brand">Férias</span>
+      <span id="shareMsg" class="share-msg" aria-live="polite"></span>
+      <button id="share" class="icon" title="Copiar link do plano" aria-label="Copiar link do plano">
+        <svg class="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+        <svg class="i-ok" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
     </div>
 
     <div class="opts">
@@ -31,15 +37,15 @@
         <div class="f w-sab"><span class="lbl">Sábado</span>
           <div class="seg" data-key="sabado" title="Sábado"><button value="1">Folga</button><button value="0">Útil</button></div>
         </div>
-        <div class="f"><span class="lbl">Facultativos</span>
+        <div class="f w-fac"><span class="lbl">Facultativos</span>
           <div class="seg" data-key="fac" title="Pontos facultativos">
             <button value="nao" title="Não contar pontos facultativos">Não</button><button value="integrais" title="Contar só os de dia inteiro">Inteiros</button><button value="todos" title="Contar também os de meio expediente">Todos</button>
           </div>
         </div>
       </div>
       <div class="row2">
-        <div class="f"><span class="lbl">De</span><div id="from" class="dp"></div></div>
-        <div class="f"><span class="lbl">Até</span><div id="to" class="dp"></div></div>
+        <div class="f w-date"><span class="lbl">De</span><div id="from" class="dp"></div></div>
+        <div class="f w-date"><span class="lbl">Até</span><div id="to" class="dp"></div></div>
       </div>
     </div>
 

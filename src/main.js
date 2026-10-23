@@ -22,11 +22,71 @@ const DEFAULTS = {
   uf: "SP", ibge: 3550308, vinculo: "privado", sabado: "1", fac: "nao",
   from: ymd(TODAY), to: `${now.getFullYear() + 2}-12-31`, total: 30, len: 30, periods: [], ovr: {}, bar: false,
 };
+// ---------- link compartilhável ----------
+// O plano vai inteiro no fragmento (#...), que o navegador não envia a servidor nenhum.
+// Ex.: #uf=SP&m=3550308&v=privado&sab=1&fac=nao&de=20261023&ate=20281231&t=30&p=20270104-10,20270712-20&o=20261224f
+const compact = (s) => s.replaceAll("-", "");
+const expand = (s) => {
+  if (!/^\d{8}$/.test(s || "")) return null;
+  const v = `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}`;
+  return ymd(fromYmd(v)) === v ? v : null;
+};
+
+function encodeShare(st) {
+  const q = { uf: st.uf, m: st.ibge, v: st.vinculo, sab: st.sabado, fac: st.fac, de: compact(st.from), ate: compact(st.to), t: st.total };
+  const p = [...st.periods].sort((x, y) => (x.s < y.s ? -1 : 1)).map((x) => `${compact(x.s)}-${x.len}`);
+  const o = Object.entries(st.ovr).sort().map(([k, v]) => compact(k) + (v === "off" ? "f" : "t"));
+  if (p.length) q.p = p.join(",");
+  if (o.length) q.o = o.join(",");
+  return Object.entries(q).map(([k, v]) => `${k}=${v}`).join("&");
+}
+
+function decodeShare(hash) {
+  const q = new URLSearchParams(hash.replace(/^#/, ""));
+  if (!q.has("uf")) return null;
+  const st = { ...DEFAULTS, periods: [], ovr: {}, bar: S.bar };
+  const one = (k, ok) => (ok.includes(q.get(k)) ? q.get(k) : undefined);
+  st.uf = q.get("uf").toUpperCase();
+  st.ibge = +q.get("m") || 0;
+  st.vinculo = one("v", ["privado", "publico"]) ?? st.vinculo;
+  st.sabado = one("sab", ["1", "0"]) ?? st.sabado;
+  st.fac = one("fac", ["nao", "integrais", "todos"]) ?? st.fac;
+  st.from = expand(q.get("de")) ?? st.from;
+  st.to = expand(q.get("ate")) ?? st.to;
+  const t = Math.round(+q.get("t"));
+  if (t >= 1 && t <= 90) st.total = t;
+  const taken = [];
+  for (const x of (q.get("p") || "").split(",")) {
+    const [, d, l] = x.match(/^(\d{8})-(\d{1,2})$/) || [];
+    const s = expand(d), len = +l;
+    if (!s || len < 1 || len > 90) continue;
+    const a = fromYmd(s), b = a + len - 1;
+    if (taken.some(([x0, x1]) => a <= x1 && b >= x0)) continue;
+    taken.push([a, b]);
+    st.periods.push({ s, len, c: st.periods.length });
+  }
+  for (const x of (q.get("o") || "").split(",")) {
+    const [, d, k] = x.match(/^(\d{8})([ft])$/) || [];
+    if (expand(d)) st.ovr[expand(d)] = k === "f" ? "off" : "work";
+  }
+  st.len = Math.max(0, st.total - st.periods.reduce((s, p) => s + p.len, 0)) || st.total;
+  return st;
+}
+
 let S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
 // versões antigas guardavam só o mês ("AAAA-MM")
 if (S.from.length === 7) S.from += "-01";
 if (S.to.length === 7) { const [y, m] = S.to.split("-").map(Number); S.to = ymd(num(y, m, 0)); }
+const shared = decodeShare(location.hash);
+if (shared) {
+  const mine = S.periods.length || Object.keys(S.ovr).length;
+  if (!mine || encodeShare(S) === encodeShare(shared) ||
+    confirm("Abrir o plano deste link? Ele substitui o plano salvo neste navegador.")) S = shared;
+  history.replaceState(null, "", location.pathname + location.search);
+}
+// Colar outro link na mesma aba só troca o fragmento, sem recarregar.
+addEventListener("hashchange", () => { if (decodeShare(location.hash)) location.reload(); });
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 
 let ufs = [], mun = [], city = null, hmap = new Map();
@@ -336,9 +396,13 @@ function showTip(n, ev) {
 // ---------- eventos ----------
 const inRange = (el) => (el && +el.dataset.n >= range.a && +el.dataset.n <= range.b ? el : null);
 
+// No celular a barra flutuante é sempre usada; o botão abre e fecha os ajustes.
+const mq = matchMedia("(max-width: 760px)");
 function setMode() {
-  document.body.classList.toggle("bar", S.bar);
-  const t = S.bar ? "Mostrar painel" : "Ocultar painel";
+  const b = document.body.classList, mob = mq.matches;
+  b.toggle("mob", mob);
+  b.toggle("bar", S.bar || mob);
+  const t = mob ? (b.contains("cfg") ? "Ocultar ajustes" : "Ajustes") : S.bar ? "Mostrar painel" : "Ocultar painel";
   $("#mode").title = t;
   $("#mode").setAttribute("aria-label", t);
 }
@@ -394,7 +458,26 @@ function bind() {
   }
 
   setMode();
-  $("#mode").addEventListener("click", () => { S.bar = !S.bar; setMode(); save(); });
+  mq.addEventListener("change", setMode);
+  $("#mode").addEventListener("click", () => {
+    if (mq.matches) document.body.classList.toggle("cfg");
+    else { S.bar = !S.bar; save(); }
+    setMode();
+  });
+  let shareT;
+  $("#share").addEventListener("click", async () => {
+    const url = `${location.origin}${location.pathname}${location.search}#${encodeShare(S)}`;
+    if (mq.matches && navigator.share) {
+      try { await navigator.share({ title: "Férias · planejador", url }); } catch {}
+      return;
+    }
+    try { await navigator.clipboard.writeText(url); }
+    catch { prompt("Copie o link do plano:", url); return; }
+    $("#share").classList.add("ok");
+    $("#shareMsg").textContent = "link copiado";
+    clearTimeout(shareT);
+    shareT = setTimeout(() => { $("#share").classList.remove("ok"); $("#shareMsg").textContent = ""; }, 1800);
+  });
   new ResizeObserver(([e]) => $("#cal").style.setProperty("--bar-h", `${e.borderBoxSize[0].blockSize}px`)).observe($("#side"));
   $("#total").addEventListener("change", (e) => {
     S.total = Math.max(1, Math.min(90, +e.target.value || 30));
@@ -444,7 +527,39 @@ function bind() {
   });
 
   const cal = $("#cal");
+  // Toque: o primeiro toque mostra a prévia, o segundo no mesmo dia confirma; segurar substitui o botão direito.
+  let touch = false, tapped = null, press = null, pressed = false;
+  const toggleOverride = (n, ev) => {
+    const k = ymd(n);
+    if (S.ovr[k]) delete S.ovr[k];
+    else S.ovr[k] = info(n).off ? "work" : "off";
+    infoCache.clear();
+    refresh();
+    showTip(n, ev);
+  };
+  const cancelPress = () => { clearTimeout(press?.t); press = null; };
+  cal.addEventListener("pointerdown", (e) => {
+    touch = e.pointerType !== "mouse";
+    pressed = false;
+    cancelPress();
+    const el = touch && inRange(e.target.closest(".d[data-n]"));
+    if (!el) return;
+    press = {
+      x: e.clientX, y: e.clientY,
+      t: setTimeout(() => { pressed = true; tapped = null; navigator.vibrate?.(15); toggleOverride(+el.dataset.n, e); }, 550),
+    };
+  });
+  cal.addEventListener("pointerup", cancelPress);
+  cal.addEventListener("pointercancel", cancelPress);
+  cal.addEventListener("pointermove", (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) cancelPress();
+  });
+  addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" && !cal.contains(e.target) && !tip.contains(e.target)) { tapped = null; hideTip(); }
+  });
+
   cal.addEventListener("mouseover", (e) => {
+    if (touch) return;
     const el = inRange(e.target.closest(".d[data-n]"));
     if (!el) return;
     const n = +el.dataset.n;
@@ -452,14 +567,24 @@ function bind() {
     showTip(n, e);
   });
   cal.addEventListener("mousemove", (e) => {
+    if (touch) return;
     const el = inRange(e.target.closest(".d[data-n]"));
     if (el && !tip.hidden) showTip(+el.dataset.n, e);
   });
-  cal.addEventListener("mouseleave", () => { hover = null; hideTip(); if (placing) paint(); });
+  cal.addEventListener("mouseleave", () => { if (touch) return; hover = null; hideTip(); if (placing) paint(); });
   cal.addEventListener("click", (e) => {
     const el = inRange(e.target.closest(".d[data-n]"));
     if (!el) return;
     const n = +el.dataset.n;
+    if (pressed) { pressed = false; return; }
+    if (touch && tapped !== n) {
+      tapped = n;
+      hover = n;
+      if (placing) paint();
+      showTip(n, e);
+      return;
+    }
+    tapped = null;
     if (placing) return place(n);
     const p = inPeriod(n);
     if (!p) return;
@@ -473,12 +598,7 @@ function bind() {
     const el = inRange(e.target.closest(".d[data-n]"));
     if (!el) return;
     e.preventDefault();
-    const n = +el.dataset.n, k = ymd(n);
-    if (S.ovr[k]) delete S.ovr[k];
-    else S.ovr[k] = info(n).off ? "work" : "off";
-    infoCache.clear();
-    refresh();
-    showTip(n, e);
+    if (!touch) toggleOverride(+el.dataset.n, e);
   });
   addEventListener("keydown", (e) => { if (e.key === "Escape" && placing) { stopPlacing(); hideTip(); } });
 }
