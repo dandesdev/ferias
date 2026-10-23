@@ -605,6 +605,7 @@ function bind() {
 
 // ---------- início ----------
 async function init() {
+  setMode();
   ufs = await getJSON("data/ufs.json");
   if (!ufs.some((u) => u.uf === S.uf)) S.uf = DEFAULTS.uf;
   $("#uf").innerHTML = ufs.map((u) => `<option value="${u.uf}" title="${u.nome}">${u.uf}</option>`).sort().join("");
