@@ -91,7 +91,7 @@ const group = (arr) => {
 const m26 = group(years.municipal2026), m25 = group(years.municipal2025);
 const stateRules = Object.fromEntries(ufs.map((u) => [u.uf, new Set(u.h.map((r) => r[0]))]));
 
-await mkdir("data/mun", { recursive: true });
+await mkdir("public/data/mun", { recursive: true });
 const perUf = {};
 for (const mu of municipios) {
   const uf = ufByCode[mu.codigo_uf];
@@ -108,7 +108,7 @@ for (const mu of municipios) {
 }
 for (const [uf, list] of Object.entries(perUf)) {
   list.sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
-  await writeFile(`data/mun/${uf}.json`, JSON.stringify(list));
+  await writeFile(`public/data/mun/${uf}.json`, JSON.stringify(list));
 }
-await writeFile("data/ufs.json", JSON.stringify(ufs));
+await writeFile("public/data/ufs.json", JSON.stringify(ufs));
 console.log(`ufs: ${ufs.length}, municípios: ${municipios.length}`);

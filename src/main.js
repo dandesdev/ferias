@@ -1,4 +1,7 @@
+import "./index.css";
+import "./styles.css";
 import { DAY, num, dow, buildHolidayMap, LEVELS } from "./holidays.js";
+import { mountDatePicker } from "./date-picker.tsx";
 
 const $ = (s) => document.querySelector(s);
 const p2 = (n) => String(n).padStart(2, "0");
@@ -12,14 +15,18 @@ const COLORS = ["#2563eb", "#7c3aed", "#0d9488", "#db2777", "#ea580c", "#4f46e5"
 const KEY = "ferias:v1";
 const now = new Date();
 const TODAY = num(now.getFullYear(), now.getMonth(), now.getDate());
-const thisMonth = `${now.getFullYear()}-${p2(now.getMonth() + 1)}`;
+const MIN_DATE = "2026-01-01";
+const MAX_DATE = `${now.getFullYear() + 12}-12-31`;
 
 const DEFAULTS = {
   uf: "SP", ibge: 3550308, vinculo: "privado", sabado: "1", fac: "nao",
-  from: thisMonth, to: `${now.getFullYear() + 2}-12`, total: 30, len: 30, periods: [], ovr: {},
+  from: ymd(TODAY), to: `${now.getFullYear() + 2}-12-31`, total: 30, len: 30, periods: [], ovr: {}, bar: false,
 };
 let S = { ...DEFAULTS };
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
+// versões antigas guardavam só o mês ("AAAA-MM")
+if (S.from.length === 7) S.from += "-01";
+if (S.to.length === 7) { const [y, m] = S.to.split("-").map(Number); S.to = ymd(num(y, m, 0)); }
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 
 let ufs = [], mun = [], city = null, hmap = new Map();
@@ -107,15 +114,13 @@ function rebuild() {
 
 // ---------- calendário ----------
 function buildCalendar() {
-  let [fy, fm] = S.from.split("-").map(Number);
-  let [ty, tm] = S.to.split("-").map(Number);
-  if (ty * 12 + tm < fy * 12 + fm) [fy, fm, ty, tm] = [ty, tm, fy, fm];
-  if (ty * 12 + tm - (fy * 12 + fm) > 120) { ty = fy + 10; tm = fm; }
-  range = { a: num(fy, fm - 1, 1), b: num(ty, tm, 0) };
+  if (S.to < S.from) [S.from, S.to] = [S.to, S.from];
+  range = { a: fromYmd(S.from), b: Math.min(fromYmd(S.to), fromYmd(S.from) + 3660) };
+  const [fy, fm] = parts(range.a), [ty, tm] = parts(range.b);
   cells.clear();
   const cal = $("#cal");
   const html = [];
-  for (let y = fy, m = fm - 1; y * 12 + m <= ty * 12 + tm - 1; m === 11 ? (y++, m = 0) : m++) {
+  for (let y = fy, m = fm; y * 12 + m <= ty * 12 + tm; m === 11 ? (y++, m = 0) : m++) {
     const first = num(y, m, 1), last = num(y, m + 1, 0);
     html.push(`<div class="mo${m === 0 ? " jan" : ""}"><h3>${MONTHS[m]}<span>${y}</span></h3>`,
       `<div class="wk"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div><div class="days">`);
@@ -146,6 +151,7 @@ function paint() {
     for (let n = st.end + 1; n <= st.b; n++) if (!over.has(n)) mark(n, "gain pv");
   }
   for (const [n, el] of cells) {
+    if (n < range.a || n > range.b) { if (el.className !== "d out") el.className = "d out"; continue; }
     const i = info(n);
     let c = "d";
     if (n < TODAY) c += " past";
@@ -225,10 +231,12 @@ function renderSide() {
       if (k > 0) {
         const prev = list[k - 1];
         const gap = p.n - prev.e - 1;
-        html.push(`<div class="gap">↕ <b>${gap}</b> dias corridos entre os períodos · ${workdaysBetween(prev.e + 1, p.n - 1)} úteis</div>`);
+        html.push(`<div class="gap" title="${gap} dias corridos entre os períodos"><span class="gt">↕ <b>${gap}</b> dias corridos entre os períodos · ${workdaysBetween(prev.e + 1, p.n - 1)} úteis</span><span class="gx">↔ <b>${gap}</b>d</span></div>`);
       }
-      html.push(`<div class="per" data-s="${p.s}" style="--pc:${COLORS[p.c % COLORS.length]}">
+      const title = `${fmt(p.n)} → ${fmt(p.e)} · ${p.len} dias · descanso de ${st.total} dias (+${st.gain} ganhos, −${st.lost} perdidos, ${st.work} úteis)`;
+      html.push(`<div class="per" data-s="${p.s}" title="${title}" style="--pc:${COLORS[p.c % COLORS.length]}">
         <button class="x" title="Remover" data-del="${p.s}">×</button>
+        <div class="cx">${fmt(p.n, false)}/${String(parts(p.n)[0]).slice(2)} → ${fmt(p.e, false)} · <b class="g">${st.total}</b> <span class="l">−${st.lost}</span></div>
         <div class="d1">${WD[dow(p.n)]} ${fmt(p.n)} → ${WD[dow(p.e)]} ${fmt(p.e)}</div>
         <div class="d2">${p.len} dias · descanso de <b>${st.total}</b> dias (${fmt(st.a, false)} → ${fmt(st.b, false)})</div>
         <div class="nums"><span class="g">+${st.gain} ganhos</span><span class="l">−${st.lost} perdidos</span><span>${st.work} úteis</span></div>
@@ -326,6 +334,15 @@ function showTip(n, ev) {
 }
 
 // ---------- eventos ----------
+const inRange = (el) => (el && +el.dataset.n >= range.a && +el.dataset.n <= range.b ? el : null);
+
+function setMode() {
+  document.body.classList.toggle("bar", S.bar);
+  const t = S.bar ? "Mostrar painel" : "Ocultar painel";
+  $("#mode").title = t;
+  $("#mode").setAttribute("aria-label", t);
+}
+
 function bind() {
   document.querySelectorAll(".seg").forEach((seg) => {
     const key = seg.dataset.key;
@@ -361,16 +378,24 @@ function bind() {
   });
   $("#city").addEventListener("focus", (e) => e.target.select());
 
+  const pickers = {};
   for (const id of ["from", "to"]) {
-    $(`#${id}`).value = S[id];
-    $(`#${id}`).addEventListener("change", (e) => {
-      if (!e.target.value || e.target.value < e.target.min) { e.target.value = S[id]; return; }
-      S[id] = e.target.value;
-      buildCalendar();
-      rebuild();
-      refresh();
+    pickers[id] = mountDatePicker($(`#${id}`), {
+      value: S[id], min: MIN_DATE, max: MAX_DATE, label: id === "from" ? "Início do período" : "Fim do período",
+      onChange: (v) => {
+        S[id] = v;
+        buildCalendar();
+        pickers.from({ value: S.from });
+        pickers.to({ value: S.to });
+        rebuild();
+        refresh();
+      },
     });
   }
+
+  setMode();
+  $("#mode").addEventListener("click", () => { S.bar = !S.bar; setMode(); save(); });
+  new ResizeObserver(([e]) => $("#cal").style.setProperty("--bar-h", `${e.borderBoxSize[0].blockSize}px`)).observe($("#side"));
   $("#total").addEventListener("change", (e) => {
     S.total = Math.max(1, Math.min(90, +e.target.value || 30));
     refresh();
@@ -420,19 +445,19 @@ function bind() {
 
   const cal = $("#cal");
   cal.addEventListener("mouseover", (e) => {
-    const el = e.target.closest(".d[data-n]");
+    const el = inRange(e.target.closest(".d[data-n]"));
     if (!el) return;
     const n = +el.dataset.n;
     if (hover !== n) { hover = n; if (placing) paint(); }
     showTip(n, e);
   });
   cal.addEventListener("mousemove", (e) => {
-    const el = e.target.closest(".d[data-n]");
+    const el = inRange(e.target.closest(".d[data-n]"));
     if (el && !tip.hidden) showTip(+el.dataset.n, e);
   });
   cal.addEventListener("mouseleave", () => { hover = null; hideTip(); if (placing) paint(); });
   cal.addEventListener("click", (e) => {
-    const el = e.target.closest(".d[data-n]");
+    const el = inRange(e.target.closest(".d[data-n]"));
     if (!el) return;
     const n = +el.dataset.n;
     if (placing) return place(n);
@@ -445,7 +470,7 @@ function bind() {
     showTip(n, e);
   });
   cal.addEventListener("contextmenu", (e) => {
-    const el = e.target.closest(".d[data-n]");
+    const el = inRange(e.target.closest(".d[data-n]"));
     if (!el) return;
     e.preventDefault();
     const n = +el.dataset.n, k = ymd(n);
@@ -469,7 +494,9 @@ async function init() {
   bind();
   rebuild();
   refresh();
-  cells.get(Math.max(TODAY, range.a))?.closest(".mo")?.scrollIntoView({ block: "start" });
+  const mo = cells.get(Math.max(TODAY, range.a))?.closest(".mo");
+  const cal = $("#cal");
+  if (mo) cal.scrollTop = mo.offsetTop - parseFloat(getComputedStyle(cal).paddingTop);
 }
 init().catch((err) => {
   console.error(err);

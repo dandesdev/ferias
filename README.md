@@ -6,20 +6,19 @@ Planejador de férias para o Brasil: mostra o calendário de um período longo c
 
 ## Rodar
 
-Site estático, sem build:
-
 ```sh
-python -m http.server 5180
+npm install
+npm run dev
 ```
 
-Abra http://localhost:5180.
+`npm run build` gera o site em `dist/`. O deploy no GitHub Pages roda pelo workflow `.github/workflows/deploy.yml` a cada push na `main`.
 
 ## Dados
 
-`data/` é gerado a partir do [feriados-brasil](https://github.com/joaopbini/feriados-brasil) (MIT):
+`public/data/` é gerado a partir do [feriados-brasil](https://github.com/joaopbini/feriados-brasil) (MIT):
 
 ```sh
-node scripts/build-data.mjs
+npm run data
 ```
 
 O script converte as datas de 2026 em regras (data fixa, relativa à Páscoa ou transferida para domingo), que o app projeta para qualquer ano.
