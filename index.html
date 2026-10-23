@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Férias · planejador</title>
+  <link rel="icon" href="assets/icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside id="side">
+    <header class="brand">Férias <span>planejador</span></header>
+
+    <section class="grp">
+      <div class="row2">
+        <label class="f w-uf">UF<select id="uf"></select></label>
+        <label class="f">Município<input id="city" list="cities" autocomplete="off" spellcheck="false"></label>
+      </div>
+      <datalist id="cities"></datalist>
+      <div class="f">Vínculo
+        <div class="seg" data-key="vinculo">
+          <button value="privado">Privado (CLT)</button><button value="publico">Serviço público</button>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="f">Sábado
+          <div class="seg" data-key="sabado"><button value="1">Folga</button><button value="0">Trabalho</button></div>
+        </div>
+        <div class="f">Pontos facultativos
+          <div class="seg" data-key="fac">
+            <button value="nao" title="Não contar pontos facultativos como folga">Não</button><button value="integrais" title="Contar só os de dia inteiro">Inteiros</button><button value="todos" title="Contar também os de meio expediente">Todos</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grp">
+      <div class="row2">
+        <label class="f">De<input type="month" id="from" min="2026-01"></label>
+        <label class="f">Até<input type="month" id="to" min="2026-01"></label>
+      </div>
+      <div class="row2">
+        <label class="f w-sm">Férias (dias)<input type="number" id="total" min="1" max="90"></label>
+        <div class="f">Extensão a trancar
+          <div class="lockrow">
+            <input type="number" id="len" min="1" max="90">
+            <button id="lock" class="lock">Trancar</button>
+          </div>
+        </div>
+      </div>
+      <div id="remain" class="remain"></div>
+    </section>
+
+    <section class="grp" id="periodsGrp">
+      <div class="ttl">Períodos <button id="clear" class="link">limpar</button></div>
+      <div id="periods"></div>
+      <div id="summary" class="summary"></div>
+    </section>
+
+    <section class="grp" id="suggGrp" hidden>
+      <div class="ttl"><span>Melhores inícios para <b id="suggLen"></b> dias</span></div>
+      <div id="sugg"></div>
+    </section>
+
+    <section class="grp legend">
+      <span><i class="sw we"></i>fim de semana</span>
+      <span><i class="sw hol"></i>feriado</span>
+      <span><i class="sw fac"></i>facultativo</span>
+      <span><i class="sw facoff"></i>facultativo não contado</span>
+      <span><i class="sw own"></i>folga sua</span>
+      <span><i class="sw per"></i>férias</span>
+      <span><i class="sw lost"></i>folga perdida</span>
+      <span><i class="sw gain"></i>dia ganho</span>
+      <span><i class="sw best"></i>bom início</span>
+    </section>
+    <p class="help">
+      <b>Trancar</b> fixa a extensão. Depois passe o mouse no calendário e clique no dia de início.
+      Clique num período para movê-lo. <b>Botão direito</b> num dia marca uma folga sua ou desconsidera um feriado.
+      <kbd>Esc</kbd> cancela.
+    </p>
+    <p class="src">Feriados municipais e estaduais: <a href="https://github.com/joaopbini/feriados-brasil" target="_blank" rel="noopener">feriados-brasil</a> (base 2026, projetada para os anos seguintes). Confira as datas locais antes de marcar suas férias.</p>
+  </aside>
+
+  <main id="cal"></main>
+  <div id="tip" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
